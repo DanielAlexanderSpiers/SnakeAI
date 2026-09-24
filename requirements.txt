@@ -1,0 +1,5 @@
+numpy>=2.2
+pygame>=2.6
+torch>=2.6
+numba>=0.61
+pytest>=8

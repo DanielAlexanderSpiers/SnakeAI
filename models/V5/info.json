@@ -1,0 +1,67 @@
+{
+  "name": "V5",
+  "created": "2026-09-24 20:42",
+  "rounds": 12,
+  "best_avg": 397.0,
+  "best_score": 397,
+  "seeds": [
+    731237371118860077
+  ],
+  "snakes": 1000,
+  "grid": 20,
+  "senses": "vision5",
+  "inputs": 81,
+  "hidden": 128,
+  "lookahead": true,
+  "shield": true,
+  "curriculum": true,
+  "stages": [
+    [
+      "short",
+      0,
+      50
+    ],
+    [
+      "mid",
+      50,
+      150
+    ],
+    [
+      "long",
+      150,
+      null
+    ]
+  ],
+  "settings": {
+    "GAMMA": 0.98,
+    "LEARNING_RATE": 0.001,
+    "BATCH_SIZE": 512,
+    "TRANSITIONS_PER_UPDATE": 1024,
+    "EPS_END": 0.001,
+    "EPS_DECAY_TRANSITIONS": 400000,
+    "SAFE_EXPLORATION": true,
+    "REWARD_APPLE": 10.0,
+    "REWARD_WIN": 100.0,
+    "REWARD_DEATH": -10.0,
+    "REWARD_STARVE": -20.0,
+    "REWARD_CLOSER": 0.1,
+    "REWARD_FURTHER": -0.15,
+    "SHAPING_FADES": true,
+    "STARVE_SLACK": 10,
+    "STARVE_SLACK_PER_SEGMENT": 1,
+    "STARVE_AREA_FACTOR": 1.0,
+    "N_STEP": 3,
+    "COMPACT_WEIGHT": 3.0,
+    "STAGES": "50,150",
+    "CONTROL_SHARE": 0.2,
+    "STAGE_EPS_START": 0.02,
+    "STAGE_EPS_DECAY": 200000,
+    "MASTERED": 0.97,
+    "EARLIER_SHARE": 0.3,
+    "CYCLE_BUFFER": 4,
+    "ROUTE_WEIGHT": 5.0
+  },
+  "stage": 2,
+  "transitions": 131197186,
+  "best_moves": 34996.93
+}

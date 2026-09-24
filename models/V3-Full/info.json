@@ -1,0 +1,37 @@
+{
+  "name": "V3-Full",
+  "created": "2026-09-24 00:19",
+  "rounds": 28,
+  "best_avg": 130.009,
+  "best_score": 349,
+  "seeds": [
+    245778759327878778
+  ],
+  "snakes": 1000,
+  "grid": 20,
+  "senses": "vision3",
+  "inputs": 57,
+  "hidden": 128,
+  "settings": {
+    "GAMMA": 0.98,
+    "LEARNING_RATE": 0.001,
+    "BATCH_SIZE": 512,
+    "TRANSITIONS_PER_UPDATE": 1024,
+    "EPS_END": 0.001,
+    "EPS_DECAY_TRANSITIONS": 400000,
+    "SAFE_EXPLORATION": true,
+    "REWARD_APPLE": 10.0,
+    "REWARD_WIN": 100.0,
+    "REWARD_DEATH": -10.0,
+    "REWARD_STARVE": -20.0,
+    "REWARD_CLOSER": 0.1,
+    "REWARD_FURTHER": -0.15,
+    "SHAPING_FADES": true,
+    "STARVE_SLACK": 10,
+    "STARVE_SLACK_PER_SEGMENT": 1,
+    "STARVE_AREA_FACTOR": 1.0,
+    "N_STEP": 3,
+    "COMPACT_WEIGHT": 3.0
+  },
+  "transitions": 69001424
+}

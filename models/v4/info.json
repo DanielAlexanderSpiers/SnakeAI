@@ -1,0 +1,62 @@
+{
+  "name": "v4",
+  "created": "2026-09-24 15:55",
+  "rounds": 123,
+  "best_avg": 145.295,
+  "best_score": 347,
+  "seeds": [
+    3752414497246011447
+  ],
+  "snakes": 1000,
+  "grid": 20,
+  "senses": "vision4",
+  "inputs": 66,
+  "hidden": 128,
+  "lookahead": true,
+  "curriculum": true,
+  "stages": [
+    [
+      "short",
+      0,
+      50
+    ],
+    [
+      "mid",
+      50,
+      150
+    ],
+    [
+      "long",
+      150,
+      null
+    ]
+  ],
+  "settings": {
+    "GAMMA": 0.98,
+    "LEARNING_RATE": 0.001,
+    "BATCH_SIZE": 512,
+    "TRANSITIONS_PER_UPDATE": 1024,
+    "EPS_END": 0.001,
+    "EPS_DECAY_TRANSITIONS": 400000,
+    "SAFE_EXPLORATION": true,
+    "REWARD_APPLE": 10.0,
+    "REWARD_WIN": 100.0,
+    "REWARD_DEATH": -10.0,
+    "REWARD_STARVE": -20.0,
+    "REWARD_CLOSER": 0.1,
+    "REWARD_FURTHER": -0.15,
+    "SHAPING_FADES": true,
+    "STARVE_SLACK": 10,
+    "STARVE_SLACK_PER_SEGMENT": 1,
+    "STARVE_AREA_FACTOR": 1.0,
+    "N_STEP": 3,
+    "COMPACT_WEIGHT": 3.0,
+    "STAGES": "50,150",
+    "CONTROL_SHARE": 0.2,
+    "STAGE_EPS_START": 0.02,
+    "STAGE_EPS_DECAY": 200000
+  },
+  "stage": 2,
+  "transitions": 212448497,
+  "curriculum_done": true
+}
