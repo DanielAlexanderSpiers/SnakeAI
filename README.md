@@ -1,72 +1,89 @@
 # SnakeAI
 
-Hundreds of snakes learning to play Snake with reinforcement learning (Deep Q-Learning),
-all sharing one neural network, until the best model fills every square of the board.
+**A neural network that teaches itself to play Snake.** It is never shown a correct move:
+a thousand snakes play at once, every move is scored with a reward, and one shared network
+learns from all of that experience which moves lead to more apples and fewer deaths. Over six
+generations of what the network can sense, it went from averaging 29 apples to filling the
+entire 20x20 board.
 
-![V5 filling a 20x20 board](docs/v5-board-filled.png)
+![Four generations of the network playing identical games](docs/compare-generations.png)
+*Four trained generations playing the exact same 100 games. The first network (top left) has
+lost every snake; each newer one keeps more alive, and V5 (bottom right) hasn't lost any.*
 
-The included model **V5** fills the whole 20x20 board (397 apples) in every game, in about
-35,000 moves. The first model, with 11 simple inputs, averaged 29 apples.
+## The network
 
-## Quick start (Windows)
+- **A Deep Q-Network (DQN) in PyTorch.** The snake's senses go in; out come three numbers, the
+  network's estimate of the future reward of turning left, going straight or turning right.
+  The snake takes the move with the highest estimate. Architecture: inputs -> 128 -> 128 -> 3.
+- **Reinforcement learning, not labelled data.** +10 for an apple, +100 for filling the board,
+  -10 for crashing, -20 for starving. The network learns to predict those rewards, and in
+  doing so learns to play.
+- **1000 snakes, one brain.** Every snake is driven by the same network and every move goes into
+  a shared replay memory of 300,000 experiences, so each tick of the game is 1000 lessons. The
+  network trains on random batches from that memory.
+- **The standard DQN toolkit:** Double DQN with a slowly-following target network, 3-step returns
+  (a death is felt by the moves that set it up, not only the last one), epsilon-greedy
+  exploration that never picks an instantly fatal random move, Huber loss, Adam.
+- **Look-ahead at play time:** before each move the snake tries all three moves on copies of the
+  board and lets the network judge where each one leads.
 
-1. Install Python 3.12 or newer.
-2. Double-click **`run.bat`**. The first run creates a virtual environment and installs
-   numpy, pygame, PyTorch and numba (a few hundred MB, once).
-3. Pick from the menu:
+## What training looks like
 
-| Option | What it does |
-|---|---|
-| 1. Train a new model | Headless training, as fast as the CPU allows |
-| 2. Continue training a model | Carries on where it stopped (same stage, same saved positions) |
-| 3. Compare models | Up to 4 models side by side, playing *identical* games |
-| 4. Watch one snake at full speed | One model, one snake, about 24,000 moves per second on a 6-core i5 (V5 fills the board in ~1.5 s), end screen when the board is full |
-| 5. Delete models | Pick which ones |
+Training runs headless and flat out on the CPU. It moves through three stages (short games to 50
+apples, mid games to 150, then long games until the board is full) so the network gets plenty of
+practice at the late game, where snakes actually die. Each stage ends by itself when the network
+stops improving.
 
-`train_best.bat` trains a model with the best settings found (vision5 senses, look-ahead,
-route safety, bigger brain, longer horizon). Command-line versions: `train.py`, `compare.py`.
+![Console output while training v4](docs/training-console.png)
 
-## How it learns
+Every model keeps a log of every round. Plotted, those logs show each generation learning more
+than the one before:
 
-- **Deep Q-Learning, one shared brain.** Every snake on the board is driven by the same
-  network (inputs -> 128 -> 128 -> 3: turn left / straight / turn right). Every move of every
-  snake goes into one replay memory, so 1000 snakes give 1000 experiences per tick. Double
-  DQN, 3-step returns, a slowly-following target network.
-- **Rewards:** +10 per apple, +100 for filling the board, -10 for crashing, -20 for starving,
-  a small nudge towards the apple that fades as the snake gets long, and potential-based
-  shaping for tidiness (not fencing space off) and for keeping the body in route order.
-- **Fair games.** Every snake starts in the same place and moves one square per tick. The only
-  luck is where apples appear, and apple *k* for a given seed is always in the same place, so
-  in comparisons snake #N of every model plays exactly the same game.
-- **Training in stages:** short games (0-50 apples), then mid (50-150), then long (150 until the
-  board is full). Later stages start from real positions the model reached itself, so it gets
-  plenty of practice at the late game, where snakes actually die. Each stage moves on when it
-  stops improving or has been mastered.
-- **Look-ahead:** before each move the snake tries all three moves on copies of the board and
-  judges where each one leads (the copies never see where the real next apple will appear).
+![Learning curves of every generation](docs/learning-curves.png)
 
-## What the snake can see
+## Six generations of senses
 
-Each model is trained with one set of senses; newer ones include everything the older ones had.
+The biggest lever was never the size of the network: it was **what the network can see**. Each
+generation adds inputs that describe the board better; all of them are facts about the board,
+never "the best move".
 
-| Senses | Inputs | What it adds |
-|---|---|---|
-| basic | 11 | Danger in the 3 squares next to the head, direction, which way the apple is |
-| vision | 42 | Room left after each move, can it reach its tail, real path distance to the apple, 8 lines of sight. All *time-aware*: body squares count as free once the tail will have moved off them |
-| vision2 | 51 | Can it escape after each move (including waiting inside its own loop), can it eat the apple safely |
-| vision3 | 57 | Tidiness: hugging walls and its body, how much space a move fences off |
-| vision4 | 66 | Distance to its own tail, is the apple fenced off, how many pieces the free board is split into |
-| vision5 | 81 | A route through every square (a Hamiltonian cycle): does a move follow it, is a shortcut safe, route distance to the apple |
+| Generation | Inputs | What the network can see | Average apples |
+|---|---|---|---|
+| basic | 11 | Danger in the 3 squares next to the head, its direction, which way the apple is | 29 |
+| vision | 42 | How much room each move leaves, whether it can still reach its own tail, the real path distance to the apple, 8 lines of sight; all time-aware (it knows its tail moves out of the way) | 116 |
+| vision2 | 51 | Whether it can escape after each move, including waiting inside a loop of its own body, and whether it can eat the apple and still get out | 127 |
+| vision3 | 57 | Tidiness: hugging walls and its own body, how much space a move would fence off | 136 |
+| vision4 | 66 | Distance to its own tail, whether the apple has been fenced off, how many pieces the free board is split into | 144 |
+| vision5 | 81 | A fixed route through every square of the board (a Hamiltonian cycle): whether a move follows it, whether a shortcut off it is safe, how far the apple is along it | **397: fills the board** |
 
-**Route safety** (vision5 option): whenever a move exists that keeps the body in route order,
-with room to spare and without skipping past the apple, the brain may only choose among those.
-That rule on its own can never crash or starve, so it always fills the board. What the brain
-learns is *speed*: which safe shortcut gets to each apple fastest.
+The networks up to vision4 all hit the same wall at around a third of the board: they would take
+a shortcut that boxed them in 300 moves later, and that consequence is too far away to learn
+from reward alone. vision5 gives the network the idea of a route; a *route safety* layer then
+only lets it choose moves that keep its body in route order, and the network's job becomes
+choosing which safe shortcut reaches each apple fastest.
+
+## Using the trained networks
+
+![V5 against the first network on the same 150 games](docs/compare-v5-vs-basic.png)
+*The first network (left) against V5 on the same 150 games: every basic snake has died, every V5
+snake is still growing.*
+
+The **compare window** plays up to four trained networks side by side on *identical* games: every
+snake starts in the same place and snake #N gets the same apples on every board, so the only
+difference is the network. Tab follows one snake across every board, R replays the last 10 seconds
+of its life on every board at once, and results show average, best, median and boards filled.
+(Colours show how often a move agrees with a simple best-move referee; V5 follows its own route,
+so it shows yellow while never dying.)
+
+The **solo viewer** runs one network on one snake with a dedicated fast engine (about 24,000
+moves per second), and stops on an end screen when the board is full:
+
+![V5 has filled the board](docs/v5-board-filled.png)
 
 ## Results
 
-20x20 board, no random moves. Averages come from side-by-side comparisons on identical games
-(Snakey's is its training average); "Best" is the best single game recorded.
+20x20 board, no random moves. Averages from side-by-side comparisons on identical games (basic:
+its training average); best = best single game recorded.
 
 | Model | Senses | Average apples | Best game | Boards filled |
 |---|---|---|---|---|
@@ -74,43 +91,34 @@ learns is *speed*: which safe shortcut gets to each apple fastest.
 | vision-v2 | vision | 116 | 195 | 0% |
 | V3-Full | vision3 | 136 | 317 | 0% |
 | v4 | vision4 + look-ahead | 144 | 347 | 0% |
-| **V5** | **vision5 + look-ahead + route safety** | **397 (full)** | **397** | **100%** |
+| **V5** | **vision5 + look-ahead + route safety** | **397** | **397** | **100%** |
 
-Without route safety, even the best senses left snakes fencing themselves in at around a third
-of the board: a shortcut that kills the snake 300 moves later is very hard to learn from reward
-alone. A scripted player reading only the vision5 senses filled 100% of boards, which is what
-led to route safety.
+## Try it (Windows)
 
-## The compare window
-
-- Colours show move quality against a best-move referee (red = bad, green = best); each snake
-  also darkens from head to tail so you can follow its body.
-- **Tab** follows one snake across every board (same apples everywhere), **R** replays the last
-  10 seconds of its life on every board at once, lined up to the moment each one died.
-- Results show average, best, median, boards filled and moves per full board.
+1. Install Python 3.12 or newer.
+2. Double-click **`run.bat`**. The first run sets up a virtual environment with PyTorch, numpy,
+   numba and pygame (a few hundred MB, once).
+3. The trained networks are included, so you can go straight to **Compare models** or **Watch
+   one snake at full speed**. **Train a new model** trains your own; `train_best.bat` uses the
+   best settings found.
 
 ## Project layout
 
 ```
-run.bat, menu.py          menu
+run.bat, menu.py          menu: train, continue training, compare, watch, delete
 train.py, compare.py      command-line training and comparing
-train_best.bat            training with the best settings
-delete_models.bat         pick models to delete
 snake/
-  game.py                 N snake games stepped together with numpy
-  senses.py               basic / vision / vision2-5 inputs (numba)
-  cycle.py                the route through every square
-  paths.py, oracle.py     time-aware path finding and the best-move referee
-  brain.py, agent.py      the network, replay memory, Double DQN, n-step returns
-  lookahead.py            trying moves out, route safety
-  trainer.py              staged training
+  brain.py                the neural network
+  agent.py                replay memory, Double DQN training step, n-step returns
+  trainer.py              staged training loop
+  senses.py               what the network sees: basic, vision ... vision5
+  game.py                 1000 snake games stepped together with numpy
+  lookahead.py            trying moves out before choosing, route safety
+  cycle.py, paths.py      the route through every square, time-aware path finding
+  oracle.py               the best-move referee used for colours and the accuracy stat
   arena.py, render.py     side-by-side comparisons, follow mode, replays
-  solo.py, fast.py        one snake at full speed and its fast engine
+  solo.py, fast.py        the one-snake viewer and its fast engine
   config.py               every setting (override any with SNAKEAI_CONFIG=NAME=value,...)
-models/                   trained models (best.pt, latest.pt, log.csv, info.json)
-tests/                    game rules, senses, referee, route, fast engine
+models/                   the trained networks and their training logs
+tests/                    game rules, senses, route, fast engine
 ```
-
-Run the tests with `.venv\Scripts\python -m pytest`.
-
-`PLAN.md` has the full development notes: every design decision, experiment and measurement.
