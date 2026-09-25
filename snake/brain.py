@@ -1,8 +1,6 @@
-"""The neural network: game inputs in, one predicted future reward (Q-value) per move out."""
-
 from torch import nn
 
-N_ACTIONS = 3   # turn left, straight, turn right
+N_ACTIONS = 3
 
 
 class Brain(nn.Module):

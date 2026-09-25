@@ -1,13 +1,3 @@
-"""Fair side-by-side comparison of trained models.
-
-Every model gets the same number of snakes, and snake i of every model plays with
-the same seed, so it is offered exactly the same apples in the same order. No random
-moves and no training happen here, so a model's result depends only on its brain.
-
-Every move of every snake is recorded, so any snake's game can be replayed up to and
-including the move that killed it.
-"""
-
 import secrets
 from dataclasses import dataclass, field
 
@@ -25,13 +15,12 @@ from .senses import observe
 
 @dataclass
 class Frame:
-    """What every snake that was alive looked like after one tick."""
-    idx: np.ndarray        # which snakes (sorted)
-    head: np.ndarray       # (m, 2)
-    apple: np.ndarray      # (m, 2)
-    length: np.ndarray     # (m,)
-    grade: np.ndarray      # (m,) referee grade of the move that led here (-1 at the start)
-    n_best: np.ndarray     # (m,) how many of the 3 moves were equally best
+    idx: np.ndarray
+    head: np.ndarray
+    apple: np.ndarray
+    length: np.ndarray
+    grade: np.ndarray
+    n_best: np.ndarray
 
 
 @dataclass
@@ -46,17 +35,16 @@ class Board:
     grade_sum: float = 0.0
     grade_count: int = 0
     frames: list = field(default_factory=list)
-    death_move: np.ndarray = None      # moves made before dying (-1 = still alive)
-    death_cell: np.ndarray = None      # where the fatal move went
-    # Totals across finished rounds
+    death_move: np.ndarray = None
+    death_cell: np.ndarray = None
     round_avgs: list = field(default_factory=list)
     round_accs: list = field(default_factory=list)
     round_wins: float = 0.0
     seed_wins: int = 0
     seeds_played: int = 0
     boards_filled: int = 0
-    scores: list = field(default_factory=list)     # every finished game's score, all rounds
-    fill_moves: list = field(default_factory=list) # moves each board-filling game took
+    scores: list = field(default_factory=list)
+    fill_moves: list = field(default_factory=list)
 
     @property
     def fill_speed(self):
@@ -80,7 +68,7 @@ class Arena:
         limit_threads()
         self.seed = int(seed) if seed is not None else secrets.randbits(62)
         self.rng = np.random.default_rng(self.seed)
-        self.plan_rng = np.random.default_rng(self.seed + 1)   # apples in look-ahead copies
+        self.plan_rng = np.random.default_rng(self.seed + 1)
         self.n, self.grid = snakes, grid
         self.boards = []
         for name in names:
@@ -95,7 +83,7 @@ class Arena:
         self.new_round()
 
     def new_round(self):
-        seeds = self.rng.integers(0, 2**62, size=self.n)     # shared by every model
+        seeds = self.rng.integers(0, 2**62, size=self.n)
         for b in self.boards:
             b.snakes.reset(seeds)
             b.obs = observe(b.snakes, b.agent.senses)
@@ -112,8 +100,6 @@ class Arena:
         self.round_over = False
 
     def tick(self):
-        """Every living snake on every board moves once. Returns True if the round just ended.
-        A finished round waits for new_round() instead of starting the next one itself."""
         if self.round_over:
             return False
         for b in self.boards:
@@ -160,7 +146,7 @@ class Arena:
         avgs = [float(b.snakes.score.mean()) for b in self.boards]
         top = max(avgs)
         winners = [b for b, a in zip(self.boards, avgs) if a == top]
-        scores = np.stack([b.snakes.score for b in self.boards])     # (models, snakes)
+        scores = np.stack([b.snakes.score for b in self.boards])
         best_per_seed = scores.max(0)
         sole_best = (scores == best_per_seed).sum(0) == 1
         for k, (b, a) in enumerate(zip(self.boards, avgs)):
@@ -175,15 +161,8 @@ class Arena:
             filled = b.snakes.death == 4
             b.fill_moves.extend((b.death_move[filled] + 1).tolist())
 
-    # ------------------------------------------------------------ replays
 
     def replay(self, board, i):
-        """Snake i's whole game on one board, move by move.
-
-        Returns a dict of arrays indexed by move number (0 = start): heads (moves+1, 2),
-        apples, lengths, grades, n_best, the tail cells it started with, and how and
-        where it died.
-        """
         heads, apples, lengths, grades, n_best = [], [], [], [], []
         for f in board.frames:
             j = np.searchsorted(f.idx, i)

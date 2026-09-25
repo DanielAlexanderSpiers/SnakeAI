@@ -1,14 +1,3 @@
-"""Deep Q-Learning. Every snake on the board shares this one brain and one memory.
-
-Each tick, every living snake adds one experience (what it saw, what it did, the
-reward, what it saw next) to the replay memory. For every TRANSITIONS_PER_UPDATE new
-experiences the brain takes one training step on a random batch from that memory.
-Tying training to experience (not ticks) keeps the cost honest: a tick with 500
-snakes alive trains about once, a tick with 3 stragglers left barely trains at all.
-
-Double DQN with a slowly-following target network keeps the Q-value targets stable.
-"""
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -46,9 +35,6 @@ class Replay:
 
 
 class NStep:
-    """Turns one-move experiences into N-move ones, per snake: the rewards of the next N
-    moves added up (discounted), then the brain's own estimate from where it ended up.
-    When a snake dies the moves still waiting are flushed with what they got."""
 
     def __init__(self, n_snakes, width, n, gamma):
         self.n, self.gamma = n, gamma
@@ -62,12 +48,9 @@ class NStep:
         self.count[:] = 0
 
     def drop(self, idx):
-        """Forget moves still waiting for these snakes (their game was stopped, not lost)."""
         self.count[idx] = 0
 
     def push(self, idx, s, a, r, s2, done):
-        """idx: which snakes moved; the rest are aligned with idx. Returns ready experiences
-        (s, a, summed reward, s after N moves, done)."""
         out = []
         c = self.count[idx]
         self.s[idx, c] = s
@@ -107,8 +90,6 @@ class NStep:
 
 
 def read_arch(path):
-    """(senses, hidden, lookahead) of a saved brain. Older files don't record all of it,
-    so fill the gaps from the weights."""
     data = torch.load(path, map_location="cpu", weights_only=False)
     arch = data.get("arch")
     if arch:
@@ -124,8 +105,8 @@ class Agent:
         torch.manual_seed(seed)
         self.rng = rng
         self.senses, self.hidden = senses, hidden
-        self.lookahead = lookahead            # try each move out before choosing (see lookahead.py)
-        self.shield = shield and senses == "vision5"   # route safety (see lookahead.py)
+        self.lookahead = lookahead
+        self.shield = shield and senses == "vision5"
         width = n_inputs(senses)
         self.online = Brain(width, hidden)
         self.target = Brain(width, hidden)
@@ -133,14 +114,13 @@ class Agent:
         self.target.requires_grad_(False)
         self.opt = torch.optim.Adam(self.online.parameters(), lr=C.LEARNING_RATE)
         self.memory = Replay(C.REPLAY_CAPACITY if memory else 1, width)
-        self.transitions = 0     # total experiences ever collected
+        self.transitions = 0
         self.updates = 0
         self.owed_updates = 0.0
         self.last_loss = float("nan")
 
     @property
     def exploring(self):
-        """Still in the random-exploration phase at the start of training."""
         return self.transitions < C.EPS_DECAY_TRANSITIONS
 
     @property
@@ -151,17 +131,13 @@ class Agent:
         return C.EPS_START + frac * (C.EPS_END - C.EPS_START)
 
     def q_values(self, states):
-        """The brain's predicted future reward for each move: (n, 3)."""
         with torch.no_grad():
             return self.online(torch.from_numpy(np.ascontiguousarray(states))).numpy()
 
     def act(self, states, epsilon, safe=None):
-        """Greedy move from the brain, replaced by a random move with probability epsilon.
-        safe: optional (n, 3) bool; random moves then only pick non-fatal moves when possible."""
         return self.explore(self.q_values(states).argmax(1), epsilon, safe)
 
     def explore(self, actions, epsilon, safe=None):
-        """Swap a random share (epsilon) of the chosen moves for random ones."""
         actions = np.array(actions, dtype=np.int64)
         if epsilon > 0:
             explore = np.flatnonzero(self.rng.random(len(actions)) < epsilon)
@@ -203,7 +179,6 @@ class Agent:
             self.updates += 1
             self.last_loss = loss.item()
 
-    # ------------------------------------------------------------ saving
 
     def save(self, path, extra=None):
         torch.save({
@@ -219,7 +194,6 @@ class Agent:
 
     @classmethod
     def from_file(cls, path, rng=None, seed=0, for_training=False):
-        """Build an agent with whatever senses/size the saved brain was trained with, and load it."""
         senses, hidden, lookahead, shield = read_arch(path)
         agent = cls(rng if rng is not None else np.random.default_rng(seed), seed,
                     senses, hidden, memory=for_training, lookahead=lookahead, shield=shield)

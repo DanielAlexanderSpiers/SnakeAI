@@ -1,20 +1,3 @@
-"""Headless training: no board is drawn, the snakes run as fast as the CPU allows.
-
-Training runs in stages by length (see STAGES in config.py): short games first, then mid,
-then long, so every part of the game gets practised properly instead of the late game
-(where snakes actually die) being a rare treat at the end of a long run.
-
-- Short stage: every snake starts fresh; a game stops at the top of the stage (50 apples).
-- Later stages: snakes start from saved positions at the stage's starting length and stop
-  at its top (the last stage runs until the board is full). Those positions come from
-  the model's own games: whenever a snake reaches 50 or 150 apples, its position is kept.
-- In later stages CONTROL_SHARE of the snakes still play whole games from the start, so
-  the early game isn't forgotten and there's an honest full-game score for picking best.pt.
-
-Each stage ends when its score (apples gained per game within the stage) hasn't improved
-for `patience` rounds, or after the round limit.
-"""
-
 import csv
 import os
 import secrets
@@ -38,7 +21,6 @@ NO_CAP = 10**9
 
 
 def stage_plan(grid, curriculum):
-    """[(name, first apple, last apple or None = until the board is full)]."""
     if not curriculum:
         return [("full", 0, None)]
     capacity = grid * grid - C.START_LENGTH
@@ -50,7 +32,6 @@ def stage_plan(grid, curriculum):
 
 
 class Pool:
-    """Saved starting positions for one stage: snakes that reached its starting length."""
 
     def __init__(self, cap):
         self.cap, self.n, self.seen, self.data = cap, 0, 0, None
@@ -64,7 +45,7 @@ class Pool:
             if self.n < self.cap:
                 slot = self.n
                 self.n += 1
-            else:                                   # keep a fair random sample of everything seen
+            else:
                 slot = int(rng.integers(self.seen))
                 if slot >= self.cap:
                     continue
@@ -157,7 +138,7 @@ class Trainer:
         if os.path.exists(log_path):
             with open(log_path) as f:
                 header = f.readline().strip().split(",")
-            if header != LOG_HEADER:                  # log from an older version: keep it aside
+            if header != LOG_HEADER:
                 os.replace(log_path, os.path.join(self.dir, "log_before_stages.csv"))
         new_log = not os.path.exists(log_path)
         self._log_file = open(log_path, "a", newline="")
@@ -165,22 +146,12 @@ class Trainer:
         if new_log:
             self._log.writerow(LOG_HEADER)
 
-    # ------------------------------------------------------------ the whole run
 
     def run(self, rounds, report=print, live=None, patience=C.PATIENCE_ROUNDS, status=print):
-        """Train every stage from the current one on, each for up to `rounds` rounds.
-
-        report(summary) after each round; live(round_no, tick, alive) about 4x a second;
-        status(text) for stage changes. A stage ends early once random exploration is
-        over and its 5-round average hasn't improved by MIN_IMPROVEMENT for `patience`
-        rounds (patience 0 = always use every round).
-        """
         self.stopped_early = []
         try:
             for k in range(self.stage, len(self.plan)):
                 self._enter_stage(k, status, live)
-                # Progress is judged on apples gained, until 90% of games fill the board;
-                # from then on it's judged on speed (fewer moves to fill it).
                 marks, judged_on, best_smooth, stale = [], None, None, 0
                 for _ in range(rounds):
                     r = self._play_round(live)
@@ -234,7 +205,6 @@ class Trainer:
         frac = min(1.0, (self.agent.transitions - self.stage_start) / C.STAGE_EPS_DECAY)
         return C.STAGE_EPS_START + frac * (C.EPS_END - C.STAGE_EPS_START)
 
-    # ------------------------------------------------------------ one round
 
     def _play_round(self, live):
         s, agent = self.snakes, self.agent
@@ -262,14 +232,14 @@ class Trainer:
                     s.restore(who, pool.view(), self.rng.integers(0, pool.n, size=len(who)),
                               self.rng.integers(0, 2**62, size=len(who)))
         start_score = s.score.copy()
-        later = np.array([p[1] for p in self.plan[1:]], dtype=np.int64)    # where later stages begin
+        later = np.array([p[1] for p in self.plan[1:]], dtype=np.int64)
         passed = start_score[:, None] >= later[None, :]
 
         obs = observe(s, self.senses)
         self.nstep.reset()
-        tidy = -fenced_off(s)                    # tidiness potential: -(share of board fenced off)
+        tidy = -fenced_off(s)
         use_route = self.senses == "vision5" and C.ROUTE_WEIGHT
-        order = obs[:, ROUTE_ORDER].copy() if use_route else None   # route potential: body in order
+        order = obs[:, ROUTE_ORDER].copy() if use_route else None
         ticks = 0
         grade_sum, grade_count = 0.0, 0
 
@@ -281,7 +251,6 @@ class Trainer:
             actions = np.zeros(s.n, dtype=np.int64)
             actions[alive] = acts
 
-            # Referee grades a random sample only; the accuracy stat doesn't need everyone.
             pick = alive if len(alive) <= C.GRADE_SAMPLE else \
                 self.sample_rng.choice(alive, C.GRADE_SAMPLE, replace=False)
             which = np.zeros(s.n, dtype=bool)
@@ -307,7 +276,7 @@ class Trainer:
                 agent.remember(*ready)
             self._keep_positions(passed, later)
             done_here = np.flatnonzero(s.alive & (s.score >= cap))
-            if len(done_here):                  # reached the top of this stage: stop there
+            if len(done_here):
                 s.finish(done_here)
                 self.nstep.drop(done_here)
             agent.learn()
@@ -324,7 +293,7 @@ class Trainer:
         fill_rate = float(filled.mean())
         fill_moves = float(s.t[tier][filled].mean()) if filled.any() else 0.0
         whole = np.arange(control) if control else tier
-        full_moves = float(s.t[whole].mean())                 # moves per whole game
+        full_moves = float(s.t[whole].mean())
         best = int(s.score.max())
         acc = grade_sum / max(1, grade_count)
         deaths = [int((s.death == c).sum()) for c in (DIED_WALL, DIED_SELF, DIED_STARVED, FINISHED)]
@@ -338,8 +307,6 @@ class Trainer:
         self.info["rounds"] = self.round_no
         self.info["transitions"] = agent.transitions
         self.info["best_score"] = max(self.info.get("best_score", 0), best)
-        # best.pt: the highest whole-game average; on a tie (e.g. every game fills the
-        # board) the one that gets there in fewer moves.
         old = self.info.get("best_avg", 0)
         improved = (full_avg is not None and agent.transitions > C.WARMUP_TRANSITIONS and
                     (full_avg > old + 0.05 or
@@ -358,7 +325,6 @@ class Trainer:
                     fill_moves=fill_moves)
 
     def _keep_positions(self, passed, later):
-        """Snakes that just reached where a later stage begins: keep their positions."""
         s = self.snakes
         for j, at in enumerate(later):
             new = np.flatnonzero(s.alive & ~passed[:, j] & (s.score >= at))
@@ -367,7 +333,6 @@ class Trainer:
                 self.pools[j + 1].add(s.snapshot(new), self.rng)
 
     def _top_up_pool(self, k, status, live):
-        """Not enough saved positions to start stage k: play games (no learning) until there are."""
         lo = self.plan[k][1]
         s, agent = self.snakes, self.agent
         status(f"  collecting positions with {lo}+ apples to start from "
@@ -399,7 +364,6 @@ class Trainer:
         if not self.pools[k].n:
             status(f"  the model never reached {lo} apples, so this stage starts from fresh games")
 
-    # ------------------------------------------------------------ saving
 
     def _save(self, filename):
         self.agent.save(os.path.join(self.dir, filename),

@@ -1,11 +1,3 @@
-"""Named models on disk. Each lives in models/<name>/ with:
-
-    best.pt      the brain from its best round (highest average score)
-    latest.pt    the brain at the end of its most recent training
-    log.csv      one row per training round
-    info.json    settings and headline numbers
-"""
-
 import json
 import os
 import re
@@ -43,7 +35,6 @@ def write_info(name, info):
 
 
 def list_models():
-    """[(name, info)] for every trained model, newest first."""
     if not os.path.isdir(MODELS):
         return []
     names = [n for n in os.listdir(MODELS) if exists(n)]
@@ -52,7 +43,6 @@ def list_models():
 
 
 def brain_path(name):
-    """best.pt if the model has one, otherwise latest.pt."""
     best = os.path.join(folder(name), "best.pt")
     return best if os.path.exists(best) else os.path.join(folder(name), "latest.pt")
 

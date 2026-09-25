@@ -1,5 +1,3 @@
-"""Train a model from the command line. Or just use run.bat."""
-
 import argparse
 
 from snake import config as C

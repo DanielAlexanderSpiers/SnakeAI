@@ -1,16 +1,3 @@
-"""A faster engine for playing a single snake (the "watch one snake" mode).
-
-The normal engine is built for thousands of snakes at once: numpy array code whose
-overhead is fine when spread over 1000 snakes but dominates with one. Here:
-
-- the game step is compiled (numba) and handles one snake, or its three look-ahead copies;
-- the brain runs as plain numpy maths (PyTorch's own overhead is bigger than the sums);
-- the three look-ahead copies live in one reused batch instead of being rebuilt each move,
-  and when the chosen move didn't eat, that copy simply becomes the real snake.
-
-It makes the same decisions as lookahead.choose_moves (tested move for move).
-"""
-
 import numpy as np
 from numba import njit
 
@@ -29,7 +16,6 @@ _STATE = ("stamp", "t", "length", "head", "dir", "apple", "alive", "score", "hun
 def _step(stamp, t, length, head, direction, apple, alive, score, hunger, budget, death, placed,
           seeds, actions, g, dy, dx, r_apple, r_win, r_death, r_starve, r_closer, r_further,
           fades, slack, per_seg, area_min, reward, done):
-    """Snakes.step for a few snakes, compiled. Same rules and rewards."""
     one = np.zeros(1, dtype=np.int64)
     for i in range(stamp.shape[0]):
         reward[i] = 0.0
@@ -74,7 +60,7 @@ def _step(stamp, t, length, head, direction, apple, alive, score, hunger, budget
             hunger[i] = 0
             dist = abs(head[i, 0] - apple[i, 0]) + abs(head[i, 1] - apple[i, 1])
             budget[i] = max(dist + slack + per_seg * length[i], area_min)
-            if not ok[0]:                          # board full: won
+            if not ok[0]:
                 alive[i] = False
                 death[i] = DIED_WON
                 reward[i] = r_win
@@ -92,7 +78,6 @@ def _step(stamp, t, length, head, direction, apple, alive, score, hunger, budget
 def _copy_state(stamp, t, length, head, direction, apple, alive, score, hunger, budget, death, placed,
                 d_stamp, d_t, d_length, d_head, d_direction, d_apple, d_alive, d_score, d_hunger,
                 d_budget, d_death, d_placed, src, dst):
-    """Copy snake `src` of one batch into rows `dst` of another (seeds are left alone)."""
     for j in dst:
         d_stamp[j, :, :] = stamp[src]
         d_t[j] = t[src]
@@ -118,7 +103,6 @@ def copy_state(src_batch, src, dst_batch, dst):
 
 
 def fast_step(snakes, actions, reward, done):
-    """Step every snake in `snakes` (a small batch) with the compiled rules."""
     g = snakes.size
     _step(snakes.stamp, snakes.t, snakes.length, snakes.head, snakes.dir, snakes.apple, snakes.alive,
           snakes.score, snakes.hunger, snakes.budget, snakes.death, snakes.apples_placed, snakes.seeds,
@@ -129,7 +113,6 @@ def fast_step(snakes, actions, reward, done):
 
 
 class NumpyBrain:
-    """The brain's three layers as plain numpy sums (identical maths, no PyTorch overhead)."""
 
     def __init__(self, agent):
         p = {k: v.detach().numpy().astype(np.float32) for k, v in agent.online.state_dict().items()}
@@ -143,7 +126,6 @@ class NumpyBrain:
 
 
 class FastPlayer:
-    """Plays the single snake in `snake` (a Snakes batch of 1) for `agent`, as fast as possible."""
 
     def __init__(self, agent, snake, rng):
         self.agent, self.snake, self.rng = agent, snake, rng
@@ -157,8 +139,6 @@ class FastPlayer:
         self.vision5 = agent.senses == "vision5"
 
     def observe(self):
-        """The real snake's senses. With look-ahead the brain only ever judges the copies, so
-        the real snake just needs what route safety checks (much cheaper than full senses)."""
         s = self.snake
         if not self.agent.lookahead or not self.agent.senses.startswith("vision"):
             return observe(s, self.agent.senses)
@@ -169,23 +149,22 @@ class FastPlayer:
         return out
 
     def step(self, obs):
-        """One move. obs = the snake's current senses (1, n). Returns its senses afterwards."""
         agent, s, sim = self.agent, self.snake, self.sim
         allowed = None
         if agent.shield:
             o = obs[0]
             allowed = [o[a * 5] != 1.0 and o[66 + a * 4 + 2] == 1.0 and o[66 + a * 4 + 3] <= o[79] + 1e-6
                        for a in range(3)]
-            if allowed.count(True) == 1:                      # only one allowed move: nothing to decide
+            if allowed.count(True) == 1:
                 return self._play(allowed.index(True))
             if not any(allowed):
                 allowed = None
         sim_obs = None
         if agent.lookahead:
-            copy_state(s, 0, sim, self.moves)                     # three fresh copies of the snake
-            sim.seeds[:] = self.rng.integers(0, 2**62, size=3)    # their own apples, never the real ones
+            copy_state(s, 0, sim, self.moves)
+            sim.seeds[:] = self.rng.integers(0, 2**62, size=3)
             candidate = np.ones(3, dtype=bool) if allowed is None else np.array(allowed)
-            sim.alive[:] = candidate                              # only try the moves it may choose
+            sim.alive[:] = candidate
             fast_step(sim, self.moves, self.r3, self.d3)
             value = self.r3.copy()
             live = candidate & ~self.d3
@@ -202,7 +181,7 @@ class FastPlayer:
             value = np.where(allowed, value, -np.inf)
         a = int(np.argmax(value))
         if agent.lookahead and sim_obs is not None and sim.score[a] == s.score[0]:
-            copy_state(sim, a, s, self.first)                     # that copy is the next position
+            copy_state(sim, a, s, self.first)
             return sim_obs[a:a + 1]
         return self._play(a)
 

@@ -1,31 +1,3 @@
-"""Works out the best possible move for every snake and grades the move it actually made.
-
-This is a referee, not a teacher. Its output only decides the snake's colour and
-the accuracy stat. It is never fed to the brain or used in rewards.
-
-"Best" follows the safe-greedy Snake strategy:
-
-1. Eat by the shortest path, but only if it is SAFE: imagine the snake following
-   that path and eating the apple, then check it can still escape afterwards.
-2. If no move has a safe path to the apple, the best move is any move the snake can
-   escape from, i.e. stay alive and wait for the body to open a way.
-3. If nothing is escapable the snake is already doomed: an earlier move boxed it in.
-   Moves then score at most TRAPPED (more room = a bit better), so it shows red.
-
-"Escape" is time-aware (see paths.py): being shut in by your own body is fine if the
-space you're in is big enough to keep moving until that body moves out of the way.
-So an apple that spawned inside a loop of the snake is not a trap if the loop is
-roomy enough to eat it and wait.
-
-Grades per move (see config.py for the numbers):
-    1.0    best move (there can be two or three equally best moves)
-    0.5    safe path to the apple but 2 moves slower (0.33 for 4 slower, ...)
-    STALL  stays alive, but a safe path to the apple was available
-    GREEDY rushes the apple by a path it can't escape from afterwards
-    TRAPPED can't escape at all: doomed
-    0.0    dies immediately
-"""
-
 import numpy as np
 from numba import njit, prange
 
@@ -100,10 +72,6 @@ def _grade_all(stamp, t, length, head, direction, apple, which, g, dy, dx,
 
 
 def grade_moves(snakes, which=None):
-    """Grades for all three possible moves: float32 array (n, 3).
-
-    which: bool mask of snakes to grade (default: every living snake). Others get zeros.
-    """
     if which is None:
         which = snakes.alive
     return _grade_all(snakes.stamp, snakes.t, snakes.length, snakes.head, snakes.dir,

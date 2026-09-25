@@ -1,12 +1,3 @@
-"""Watch one model play one snake at a time, as fast as the computer allows.
-
-No other models, no referee grading and only one snake, so nearly all the time goes on
-playing moves (with the fast engine in fast.py); the board is only redrawn about 30
-times a second. Games follow each other automatically and the panel keeps a running
-tally (average, best, boards filled and how many moves a full board took). When a snake
-fills the board, play stops on the full board with an end screen until a key is pressed.
-"""
-
 import time
 
 import numba
@@ -21,8 +12,8 @@ from .game import Snakes, DIED_SELF, DIED_WALL, DIED_WON
 from .render import (ACCENT, APPLE, APPLE_EDGE, BG, CHECK_A, CHECK_B, DEATHS, DIM, PANEL, TEXT, WARN,
                      tail_shade)
 
-SPEEDS = [10, 30, 100, 300, 1000, 3000, 10000, 0]   # moves per second, 0 = as fast as possible
-FRAME = 1 / 30                                      # redraw this often at top speed
+SPEEDS = [10, 30, 100, 300, 1000, 3000, 10000, 0]
+FRAME = 1 / 30
 BODY = np.array([70, 220, 90], dtype=np.float32)
 HEAD = np.array([170, 255, 180], dtype=np.float32)
 PANEL_W = 340
@@ -30,7 +21,6 @@ PANEL_W = 340
 
 class Solo:
     def __init__(self, name, grid, seed=None):
-        # One snake: thread start-up costs more than it saves, so run everything on one thread.
         numba.set_num_threads(1)
         torch.set_num_threads(1)
         self.name = name
@@ -41,17 +31,15 @@ class Solo:
         self.player = FastPlayer(self.agent, self.snake, self.rng)
         self.scores, self.moves, self.fill_moves, self.causes = [], [], [], []
         self.last = None
-        self.final = None                  # the full board of the last game that filled it
+        self.final = None
         self.new_game()
 
     def new_game(self):
         self.snake.reset()
         self.obs = self.player.observe()
-        self.play_time = 0.0               # seconds actually spent playing this game
+        self.play_time = 0.0
 
     def play(self, budget):
-        """Play moves for up to `budget` seconds (or `budget` moves if it's an int).
-        Returns (moves played, True if a game just filled the board)."""
         s, step = self.snake, self.player.step
         started = time.perf_counter()
         deadline = started + budget if isinstance(budget, float) else None
@@ -82,7 +70,7 @@ class Solo:
         s = self.snake
         score, moves, cause = int(s.score[0]), int(s.t[0]), int(s.death[0])
         if cause in (DIED_WALL, DIED_SELF):
-            moves += 1                             # a crash isn't counted as a completed move
+            moves += 1
         self.scores.append(score)
         self.moves.append(moves)
         self.causes.append(cause)
@@ -223,9 +211,9 @@ def run_solo(name, grid, seed=None):
     pygame.init()
     solo = Solo(name, grid, seed)
     window = SoloWindow(solo)
-    speed = len(SPEEDS) - 1                       # start at maximum speed
+    speed = len(SPEEDS) - 1
     paused = False
-    end_screen = False                            # showing a filled board, waiting for a key
+    end_screen = False
     clock = pygame.time.Clock()
     owed = 0.0
     tps, count, since = 0.0, 0, time.perf_counter()
@@ -241,7 +229,7 @@ def run_solo(name, grid, seed=None):
                     running = False
                 elif end_screen:
                     if e.key in (pygame.K_SPACE, pygame.K_n, pygame.K_RETURN):
-                        end_screen = False        # the next game is already set up
+                        end_screen = False
                 elif e.key == pygame.K_SPACE:
                     paused = not paused
                 elif e.key in (pygame.K_UP, pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
@@ -255,7 +243,7 @@ def run_solo(name, grid, seed=None):
 
             target = SPEEDS[speed]
             if not paused and not end_screen:
-                if target == 0:                   # play flat out until it's time to redraw
+                if target == 0:
                     played, filled = solo.play(FRAME)
                 else:
                     owed += target * FRAME

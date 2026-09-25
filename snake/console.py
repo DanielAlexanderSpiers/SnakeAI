@@ -1,5 +1,3 @@
-"""Console output for training and comparisons (used by menu.py, train.py and compare.py)."""
-
 import os
 import time
 
@@ -18,7 +16,7 @@ def _clock(secs):
 def train(name, snakes=None, grid=None, rounds=C.DEFAULT_ROUNDS, resume=False, seed=None,
           patience=C.PATIENCE_ROUNDS, senses=None, hidden=None, lookahead=None, curriculum=None,
           shield=None):
-    from .trainer import Trainer                      # torch/numba import takes a moment
+    from .trainer import Trainer
     print("\nLoading...", end="\r", flush=True)
     t = Trainer(name, snakes, grid, resume=resume, seed=seed, senses=senses, hidden=hidden,
                 lookahead=lookahead, curriculum=curriculum, shield=shield)

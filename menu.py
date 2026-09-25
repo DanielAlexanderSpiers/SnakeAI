@@ -1,5 +1,3 @@
-"""Interactive menu. run.bat starts this."""
-
 import os
 import shutil
 import sys
@@ -115,7 +113,6 @@ def watch_solo(listing):
 
 
 def delete_models():
-    """Pick which trained models to delete for good."""
     listing = models.list_models()
     if not listing:
         print("  There are no models to delete.")

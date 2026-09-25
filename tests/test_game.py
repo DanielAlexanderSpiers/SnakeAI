@@ -41,7 +41,6 @@ def test_everyone_starts_in_the_same_place():
 
 
 def test_same_seed_same_apples_whatever_the_brain_does():
-    # Two copies of one game: one snake eats its apple, the other wanders first.
     a, b = Snakes(1, 20), Snakes(1, 20)
     a.reset([123])
     b.reset([123])
@@ -49,14 +48,13 @@ def test_same_seed_same_apples_whatever_the_brain_does():
     first = a.apple[0].copy()
 
     def eat(s):
-        # Teleport the head next to the apple and step onto it.
         y, x = s.apple[0]
         s.set_snake(0, [(y + 1, x), (y + 2, x), (y + 3, x)] if y + 3 < 20 else
                     [(y - 1, x), (y - 2, x), (y - 3, x)], UP if y + 3 < 20 else DOWN, (y, x))
         s.apples_placed[0] = 1
         s.step(act(STRAIGHT))
 
-    b.step(act(TURN_LEFT))                   # b does something different first
+    b.step(act(TURN_LEFT))
     eat(a)
     eat(b)
     assert (a.apple == b.apple).all() and not (a.apple[0] == first).all()
@@ -68,7 +66,7 @@ def test_moving_straight():
     s.step(act(STRAIGHT))
     assert tuple(s.head[0]) == (4, 5)
     assert s.body_mask(0).sum() == 3
-    assert not s.body_mask(0)[7, 5]          # tail moved on
+    assert not s.body_mask(0)[7, 5]
 
 
 def test_turns_are_relative():
@@ -90,7 +88,6 @@ def test_wall_kills():
 
 def test_self_collision_kills():
     s = make()
-    # Head at (5,5) facing left, body curls round so turning right (up) hits (4,5).
     body = [(5, 5), (5, 6), (4, 6), (4, 5), (4, 4), (3, 4)]
     s.set_snake(0, body, LEFT, apple=(9, 9))
     _, done, _ = s.step(act(TURN_RIGHT))
@@ -99,7 +96,6 @@ def test_self_collision_kills():
 
 def test_chasing_own_tail_is_allowed():
     s = make()
-    # A 2x2 loop: the head moves into the cell the tail is leaving.
     body = [(5, 5), (5, 6), (4, 6), (4, 5)]
     s.set_snake(0, body, LEFT, apple=(9, 9))
     _, done, _ = s.step(act(TURN_RIGHT))
@@ -122,7 +118,6 @@ def test_starvation_is_strict():
     budget = int(s.budget[0])
     assert budget == max(2 + C.STARVE_SLACK + C.STARVE_SLACK_PER_SEGMENT * 3,
                          int(C.STARVE_AREA_FACTOR * 10 * 10))
-    # Spin in a 2x2 circle, never eating.
     moves = 0
     while s.alive[0]:
         reward, done, _ = s.step(act(TURN_RIGHT))
@@ -135,7 +130,6 @@ def test_snakes_do_not_interact():
     s = make(n=2)
     s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(0, 0))
     s.set_snake(1, [(4, 4), (4, 5), (4, 6)], LEFT, apple=(0, 9))
-    # Snake 0 moves straight into cells snake 1 occupies.
     _, done, _ = s.step(act(STRAIGHT, STRAIGHT))
     assert not done.any()
 
@@ -154,16 +148,14 @@ def test_senses():
     s = make()
     s.set_snake(0, [(0, 5), (1, 5), (2, 5)], UP, apple=(5, 9))
     o = observe(s, "basic")[0]
-    assert list(o[:3]) == [1, 0, 0]              # wall straight ahead only
-    assert list(o[3:7]) == [1, 0, 0, 0]          # facing up
-    assert list(o[7:]) == [0, 1, 0, 1]           # apple is down and right
+    assert list(o[:3]) == [1, 0, 0]
+    assert list(o[3:7]) == [1, 0, 0, 0]
+    assert list(o[7:]) == [0, 1, 0, 1]
 
-
-# ---------------------------------------------------------------- referee
 
 def test_oracle_prefers_shortest_path():
     s = make()
-    s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(5, 8))   # apple 3 to the right
+    s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(5, 8))
     g = grade_moves(s)[0]
     assert g[TURN_RIGHT] == 1.0
     assert 0 < g[STRAIGHT] < 1.0
@@ -172,7 +164,7 @@ def test_oracle_prefers_shortest_path():
 
 def test_oracle_diagonal_has_two_best_moves():
     s = make()
-    s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(2, 8))   # up and right
+    s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(2, 8))
     g = grade_moves(s)[0]
     assert g[STRAIGHT] == 1.0 and g[TURN_RIGHT] == 1.0
 
@@ -187,8 +179,6 @@ def test_oracle_fatal_move_scores_zero():
 
 def test_oracle_spots_trap():
     s = make(grid=10)
-    # Head at (5,5) facing up. The body wraps round so that the cells straight ahead (4,5)
-    # and to the right (5,6) are one-cell dead ends; only turning left escapes.
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4), (4, 3), (4, 2), (4, 1)]
     s.set_snake(0, body, UP, apple=(8, 4))
@@ -200,8 +190,6 @@ def test_oracle_spots_trap():
 
 def test_oracle_counts_tail_as_moving():
     s = make(grid=10)
-    # Same wrap but short: the tail at (4,4) will have moved on by the time the head
-    # gets there, so going straight is not a trap.
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4)]
     s.set_snake(0, body, UP, apple=(8, 4))
@@ -211,15 +199,12 @@ def test_oracle_counts_tail_as_moving():
 
 def test_oracle_punishes_greedy_trap():
     s = make(grid=10)
-    # Same wrap as the trap test, but the apple sits in the one-cell dead end straight
-    # ahead. Eating it is possible, but then the snake is walled in by its own body and
-    # dies. Turning left gives up the apple for now but keeps the tail reachable.
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4), (4, 3), (4, 2), (4, 1)]
     s.set_snake(0, body, UP, apple=(4, 5))
     g = grade_moves(s)[0]
-    assert g[STRAIGHT] == pytest.approx(C.GRADE_GREEDY)   # eats, then boxed in
-    assert g[TURN_LEFT] == 1.0                           # survives
+    assert g[STRAIGHT] == pytest.approx(C.GRADE_GREEDY)
+    assert g[TURN_LEFT] == 1.0
     assert g[TURN_RIGHT] == pytest.approx(C.GRADE_TRAPPED)
 
 
@@ -232,7 +217,6 @@ def test_oracle_eats_when_safe():
 
 
 def test_apple_placement_is_fast_path_equivalent():
-    # Same seeds on two boards -> same apples, even across many rounds.
     a, b = Snakes(300, 25), Snakes(300, 25)
     seeds = np.arange(300) * 7919
     a.reset(seeds)
@@ -242,8 +226,6 @@ def test_apple_placement_is_fast_path_equivalent():
         assert not a.body_mask(i)[tuple(a.apple[i])]
 
 
-# ---------------------------------------------------------------- vision senses
-
 def vision(s):
     return observe(s, "vision")[0]
 
@@ -252,10 +234,10 @@ def test_vision_wall_and_open_moves():
     s = make(grid=10)
     s.set_snake(0, [(0, 5), (1, 5), (2, 5)], UP, apple=(5, 9))
     v = vision(s)
-    assert v[1 * 5] == 1.0                       # straight = into the wall
-    for a in (0, 2):                             # left / right are open, tail reachable
+    assert v[1 * 5] == 1.0
+    for a in (0, 2):
         assert v[a * 5] == 0.0 and v[a * 5 + 1] > 0.9 and v[a * 5 + 3] == 1.0
-    assert v[15] == 1.0                          # sight line ahead: wall is 1 step away
+    assert v[15] == 1.0
 
 
 def test_vision_sees_dead_ends():
@@ -271,7 +253,6 @@ def test_vision_sees_dead_ends():
 
 def test_vision_knows_the_tail_moves_away():
     s = make(grid=10)
-    # Short wrap: the would-be dead end opens up because the tail at (4,4) moves on in time.
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4)]
     s.set_snake(0, body, UP, apple=(8, 4))
@@ -281,24 +262,23 @@ def test_vision_knows_the_tail_moves_away():
 
 def test_vision_apple_position_is_relative():
     s = make(grid=10)
-    s.set_snake(0, [(5, 5), (5, 4), (5, 3)], RIGHT, apple=(2, 5))   # facing right, apple 3 up
+    s.set_snake(0, [(5, 5), (5, 4), (5, 3)], RIGHT, apple=(2, 5))
     v = vision(s)
-    assert v[39] == pytest.approx(0.0)           # not ahead or behind
-    assert v[40] == pytest.approx(-0.3)          # 3 to the left of the way it faces
+    assert v[39] == pytest.approx(0.0)
+    assert v[40] == pytest.approx(-0.3)
 
 
 def test_safe_moves_and_safe_exploration():
     from snake.agent import Agent
     s = make(n=1, grid=10)
-    s.set_snake(0, [(0, 0), (1, 0), (2, 0)], UP, apple=(9, 9))     # top-left corner facing up
-    assert s.safe_moves()[0].tolist() == [False, False, True]    # only turning right is safe
+    s.set_snake(0, [(0, 0), (1, 0), (2, 0)], UP, apple=(9, 9))
+    assert s.safe_moves()[0].tolist() == [False, False, True]
     agent = Agent(np.random.default_rng(0), 0, "basic")
     states = np.zeros((500, 11), dtype=np.float32)
     acts = agent.act(states, 1.0, np.repeat(s.safe_moves(), 500, axis=0))
     assert (acts == TURN_RIGHT).all()
 
 
-# A snake whose body forms a closed ring with its head inside a 3x3 pocket.
 _RING = [(4, 4), (4, 3), (4, 2), (5, 2), (6, 2), (6, 3), (6, 4), (6, 5), (6, 6), (5, 6), (4, 6),
          (3, 6), (2, 6), (2, 5), (2, 4), (2, 3), (2, 2), (3, 2)]
 _OUTSIDE = [(3, 1), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (9, 0), (10, 0), (11, 0),
@@ -307,28 +287,23 @@ _OUTSIDE = [(3, 1), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (9, 0), (10,
 
 def test_boxed_in_but_roomy_enough_to_wait_is_fine():
     s = make(grid=12)
-    # Short tail outside the ring: the ring opens after 3 moves and the pocket has 7 free
-    # cells to circle in, so the snake can wait it out. Not a trap.
     s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))
     assert grade_moves(s)[0].max() == 1.0
 
 
 def test_boxed_in_for_too_long_is_doomed():
     s = make(grid=12)
-    # Long tail: the ring stays shut for 13 moves but the pocket only has room for ~7.
     s.set_snake(0, _RING + _OUTSIDE[:12], RIGHT, apple=(11, 11))
     assert grade_moves(s)[0].max() <= C.GRADE_TRAPPED
 
 
 def test_filling_the_board_wins():
     s = make(grid=8)
-    # Snake covers every square except the apple, in a serpentine; eating it fills the board.
     cells = []
     for y in range(8):
         row = [(y, x) for x in range(8)]
         cells += row if y % 2 == 0 else row[::-1]
-    # cells runs from (0,0) to (7,0); the head is the last cell, apple the one before... use:
-    body = cells[::-1][1:]            # head at (7,1), tail at (0,0); (7,0) is left for the apple
+    body = cells[::-1][1:]
     s.set_snake(0, body, LEFT, apple=(7, 0))
     reward, done, ate = s.step(act(STRAIGHT))
     assert ate[0] and done[0] and s.death[0] == 4 and s.length[0] == 64
@@ -347,59 +322,55 @@ def test_shaping_fades_as_the_snake_grows():
 
 def test_vision2_lookahead():
     s = make(grid=12)
-    s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))    # roomy pocket
+    s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))
     v = observe(s, "vision2")[0]
     assert v.shape == (51,)
-    assert v[42 + 1 * 3] == 1.0                   # straight: can wait it out
-    s.set_snake(0, _RING + _OUTSIDE[:12], RIGHT, apple=(11, 11))   # pocket shut too long
+    assert v[42 + 1 * 3] == 1.0
+    s.set_snake(0, _RING + _OUTSIDE[:12], RIGHT, apple=(11, 11))
     v = observe(s, "vision2")[0]
     for a in range(3):
-        assert v[42 + a * 3] == 0.0               # no escape whichever way
-        assert v[42 + a * 3 + 1] > 0.0            # ...and it can see how long the wait is
+        assert v[42 + a * 3] == 0.0
+        assert v[42 + a * 3 + 1] > 0.0
 
 
 def test_vision2_eat_safe():
     s = make(grid=10)
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4), (4, 3), (4, 2), (4, 1)]
-    s.set_snake(0, body, UP, apple=(4, 5))        # apple in a one-cell dead end ahead
+    s.set_snake(0, body, UP, apple=(4, 5))
     v = observe(s, "vision2")[0]
-    assert v[42 + 1 * 3 + 2] == 0.0               # eating it straight ahead is not safe
+    assert v[42 + 1 * 3 + 2] == 0.0
     s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(1, 5))
     v = observe(s, "vision2")[0]
     assert v[42 + 1 * 3 + 2] == 1.0 and v[42 + 1 * 3] == 1.0
 
-
-# ---------------------------------------------------------------- compare + replays
 
 def test_arena_waits_at_round_end_and_replays_deaths(tmp_path, monkeypatch):
     from snake import models
     from snake.agent import Agent
     from snake.arena import Arena
     path = tmp_path / "brain.pt"
-    Agent(np.random.default_rng(0), 0, "basic").save(str(path))       # untrained: dies quickly
+    Agent(np.random.default_rng(0), 0, "basic").save(str(path))
     monkeypatch.setattr(models, "brain_path", lambda name: str(path))
     arena = Arena(["a", "b"], 30, 12, seed=1)
     for _ in range(5000):
         if arena.tick():
             break
     assert arena.round_over and arena.round_no == 1
-    assert not arena.tick() and arena.round_no == 1          # does not start the next round itself
+    assert not arena.tick() and arena.round_no == 1
 
     b = arena.boards[0]
     for i in range(arena.n):
         game = arena.replay(b, i)
         heads = game["heads"]
         assert len(heads) == b.death_move[i] + 1
-        assert (np.abs(np.diff(heads, axis=0)).sum(1) == 1).all()   # one square per move
+        assert (np.abs(np.diff(heads, axis=0)).sum(1) == 1).all()
         assert game["died"]
-        if game["cause"] in (1, 2):                                  # the fatal move is next door
+        if game["cause"] in (1, 2):
             assert np.abs(np.array(game["death_cell"]) - heads[-1]).sum() == 1
     arena.new_round()
     assert arena.round_no == 2 and not arena.round_over
 
-
-# ---------------------------------------------------------------- learning helpers
 
 def test_nstep_sums_rewards_and_flushes_on_death():
     from snake.agent import NStep
@@ -413,7 +384,7 @@ def test_nstep_sums_rewards_and_flushes_on_death():
         out = ns.push(idx, s, np.array([k]), np.array([r], dtype=np.float32), s2, np.array([k == 4]))
         if out is not None:
             got += list(zip(out[1].tolist(), out[2].tolist(), out[4].tolist()))
-    assert [a for a, _, _ in got] == [0, 1, 2, 3, 4]          # every move becomes one experience
+    assert [a for a, _, _ in got] == [0, 1, 2, 3, 4]
     rets = dict((a, r) for a, r, _ in got)
     assert rets[0] == pytest.approx(1 + 2 * g + 3 * g * g)
     assert rets[2] == pytest.approx(3 + 4 * g + 5 * g * g)
@@ -436,27 +407,27 @@ def test_fenced_off_measures_shut_off_space():
     s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))
     frac = fenced_off(s)[0]
     free = 144 - s.length[0]
-    assert frac == pytest.approx((free - 7) / free)     # only the 7 pocket squares are reachable
+    assert frac == pytest.approx((free - 7) / free)
     s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(0, 0))
     assert fenced_off(s)[0] == 0.0
 
 
 def test_vision3_hug_and_fence():
-    left, straight = 51, 53                     # (hug, fenced) pairs per move: left, straight, right
+    left, straight = 51, 53
     s = make(grid=10)
-    s.set_snake(0, [(5, 1), (6, 1), (7, 1)], UP, apple=(0, 9))    # one square away from the left wall
+    s.set_snake(0, [(5, 1), (6, 1), (7, 1)], UP, apple=(0, 9))
     v = observe(s, "vision3")[0]
     assert v.shape == (57,)
-    assert v[straight] == 0.0                   # (4,1): nothing around it
-    assert v[left] == pytest.approx(1 / 3)      # (5,0): against the wall
-    assert v[left + 1] == 0.0 and v[straight + 1] == 0.0          # nothing gets fenced off
-    s.set_snake(0, [(5, 0), (6, 0), (7, 0)], UP, apple=(0, 9))    # hugging the left wall
+    assert v[straight] == 0.0
+    assert v[left] == pytest.approx(1 / 3)
+    assert v[left + 1] == 0.0 and v[straight + 1] == 0.0
+    s.set_snake(0, [(5, 0), (6, 0), (7, 0)], UP, apple=(0, 9))
     v = observe(s, "vision3")[0]
-    assert v[straight] == pytest.approx(1 / 3)                    # straight keeps hugging it
+    assert v[straight] == pytest.approx(1 / 3)
     s = make(grid=12)
-    s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))   # head inside its own ring
+    s.set_snake(0, _RING + _OUTSIDE[:2], RIGHT, apple=(11, 11))
     v = observe(s, "vision3")[0]
-    assert v[straight + 1] > 0.9                # nearly the whole board is shut off from it
+    assert v[straight + 1] > 0.9
 
 
 def test_replay_lines_up_both_deaths(tmp_path, monkeypatch):
@@ -464,25 +435,22 @@ def test_replay_lines_up_both_deaths(tmp_path, monkeypatch):
     from snake.agent import Agent
     from snake.arena import Arena
     from snake.render import Replay
-    for name, seed in (("a", 0), ("b", 1)):                     # two different (untrained) brains
+    for name, seed in (("a", 0), ("b", 1)):
         Agent(np.random.default_rng(seed), seed, "basic").save(str(tmp_path / f"{name}.pt"))
     monkeypatch.setattr(models, "brain_path", lambda name: str(tmp_path / f"{name}.pt"))
     arena = Arena(["a", "b"], 40, 12, seed=4)
     while not arena.tick():
         pass
-    # Find a snake whose two games lasted different lengths.
     i = next(i for i in range(40) if arena.boards[0].death_move[i] != arena.boards[1].death_move[i])
-    r = Replay(arena, i, moves_per_second=2)                  # 10 s at 2 moves/s = 20 moves back
+    r = Replay(arena, i, moves_per_second=2)
     assert r.k == max(r.first, -20)
-    r.k = 0                                                     # the last position before dying...
-    assert [r.frame(b)[0] for b in range(2)] == r.moves         # ...is each game's own last move
+    r.k = 0
+    assert [r.frame(b)[0] for b in range(2)] == r.moves
     r.step(1)
-    assert all(r.frame(b)[1] for b in range(2))                 # then both show their fatal move
+    assert all(r.frame(b)[1] for b in range(2))
     r.step(-5)
     assert [r.frame(b)[0] for b in range(2)] == [max(0, m - 4) for m in r.moves]
 
-
-# ---------------------------------------------------------------- vision4, positions, look-ahead, stages
 
 def test_vision4_tail_apple_and_split():
     s = make(grid=10)
@@ -491,15 +459,15 @@ def test_vision4_tail_apple_and_split():
     assert v.shape == (66,)
     assert np.array_equal(v[:57], observe(s, "vision3")[0])
     straight = 57 + 3
-    assert v[straight + 1] == 1.0                 # apple still reachable
-    assert v[straight + 2] == 0.0                 # board still in one piece
-    assert 0.0 < v[straight] <= 1.0               # tail reachable
+    assert v[straight + 1] == 1.0
+    assert v[straight + 2] == 0.0
+    assert 0.0 < v[straight] <= 1.0
     s = make(grid=12)
-    s.set_snake(0, _RING + _OUTSIDE[:12], RIGHT, apple=(11, 11))   # head shut inside its ring
+    s.set_snake(0, _RING + _OUTSIDE[:12], RIGHT, apple=(11, 11))
     v = observe(s, "vision4")[0]
-    assert v[straight + 1] == 0.0                 # apple fenced off
-    assert v[straight] == 0.0                     # tail out of reach
-    assert v[straight + 2] > 0.0                  # the rest of the board is a separate piece
+    assert v[straight + 1] == 0.0
+    assert v[straight] == 0.0
+    assert v[straight + 2] > 0.0
 
 
 def test_snapshot_and_restore_round_trip():
@@ -517,7 +485,7 @@ def test_snapshot_and_restore_round_trip():
     assert b.alive[0] and not b.body_mask(0)[tuple(b.apple[0])]
     b.step(act(STRAIGHT, STRAIGHT))
     a.step(act(STRAIGHT, STRAIGHT, STRAIGHT))
-    assert (b.head[0] == a.head[1]).all()        # plays on exactly like the original
+    assert (b.head[0] == a.head[1]).all()
 
 
 def test_copies_are_independent_and_hide_the_real_apple():
@@ -525,13 +493,12 @@ def test_copies_are_independent_and_hide_the_real_apple():
     s.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(4, 5))
     sim = Snakes.copies(s, np.array([0]), 3, np.array([1, 2, 3]))
     sim.step(np.array([0, 1, 2]))
-    assert tuple(s.head[0]) == (5, 5)             # the original didn't move
-    assert sim.score.tolist() == [0, 1, 0]        # only the straight copy ate
+    assert tuple(s.head[0]) == (5, 5)
+    assert sim.score.tolist() == [0, 1, 0]
     real_next = make(n=1, grid=10)
     real_next.set_snake(0, [(5, 5), (6, 5), (7, 5)], UP, apple=(4, 5))
     real_next.seeds[0] = s.seeds[0]
     real_next.step(act(STRAIGHT))
-    # The copy's next apple comes from its own seed, not the real game's.
     assert sim.seeds[1] != s.seeds[0]
 
 
@@ -542,9 +509,9 @@ def test_lookahead_avoids_the_trap_the_brain_cant_see():
     s = make(grid=10)
     body = [(5, 5), (6, 5), (6, 6), (6, 7), (5, 7), (4, 7), (4, 6), (3, 6), (3, 5),
             (3, 4), (4, 4), (4, 3), (4, 2), (4, 1)]
-    s.set_snake(0, [(0, 5), (1, 5), (2, 5)], UP, apple=(9, 9))     # wall straight ahead
+    s.set_snake(0, [(0, 5), (1, 5), (2, 5)], UP, apple=(9, 9))
     v = move_values(agent, s, np.array([0]), np.random.default_rng(0))[0]
-    assert v[STRAIGHT] == pytest.approx(C.REWARD_DEATH)           # it sees the crash coming
+    assert v[STRAIGHT] == pytest.approx(C.REWARD_DEATH)
     acts = choose_moves(agent, s, np.array([0]), observe(s, "basic")[[0]], 0.0, np.random.default_rng(0))
     assert acts[0] != STRAIGHT
 
@@ -552,11 +519,9 @@ def test_lookahead_avoids_the_trap_the_brain_cant_see():
 def test_stage_plan():
     from snake.trainer import stage_plan
     assert stage_plan(20, True) == [("short", 0, 50), ("mid", 50, 150), ("long", 150, None)]
-    assert stage_plan(10, True) == [("short", 0, 50), ("long", 50, None)]    # 150 doesn't fit on 10x10
+    assert stage_plan(10, True) == [("short", 0, 50), ("long", 50, None)]
     assert stage_plan(20, False) == [("full", 0, None)]
 
-
-# ---------------------------------------------------------------- the route (vision5)
 
 @pytest.mark.parametrize("g", [8, 10, 12, 20])
 def test_route_visits_every_square_once_in_a_loop(g):
@@ -565,8 +530,8 @@ def test_route_visits_every_square_once_in_a_loop(g):
     assert sorted(order.ravel().tolist()) == list(range(g * g))
     cells = route_cells(g)
     steps = np.abs(np.diff(np.vstack([cells, cells[:1]]), axis=0)).sum(1)
-    assert (steps == 1).all()                              # each square next to the one after it
-    n = g * g                                              # the starting body runs tail -> head
+    assert (steps == 1).all()
+    n = g * g
     assert (order[g // 2, g // 2] - order[g // 2 + 1, g // 2]) % n == 1
     assert (order[g // 2 + 1, g // 2] - order[g // 2 + 2, g // 2]) % n == 1
 
@@ -583,9 +548,9 @@ def test_vision5_at_the_start():
     v = observe(s, "vision5")[0]
     assert v.shape == (81,)
     assert np.array_equal(v[:66], observe(s, "vision4")[0])
-    assert v[80] == 1.0                                    # starting body is in route order
+    assert v[80] == 1.0
     follows = [a for a in range(3) if v[66 + a * 4 + 1] == 1.0]
-    assert len(follows) == 1 and v[66 + follows[0] * 4 + 2] == 1.0   # following is safe
+    assert len(follows) == 1 and v[66 + follows[0] * 4 + 2] == 1.0
 
 
 def test_route_senses_are_enough_to_fill_the_board():
@@ -603,7 +568,7 @@ def test_route_senses_are_enough_to_fill_the_board():
                   and (s.length[i] <= area // 2 or o[66 + a * 4 + 1] == 1)]
             acts[i] = min(ok, key=lambda a: o[66 + a * 4 + 3])
         s.step(acts)
-    assert (s.death == 4).all()                            # every game filled the board
+    assert (s.death == 4).all()
 
 
 @pytest.mark.parametrize("lookahead,shield", [(True, True), (True, False), (False, False)])
@@ -621,7 +586,7 @@ def test_fast_single_snake_engine_plays_exactly_like_normal_play(lookahead, shie
     for move in range(400):
         if not a.alive[0]:
             break
-        rb.bit_generator.state = ra.bit_generator.state      # same imagined apples in the look-ahead
+        rb.bit_generator.state = ra.bit_generator.state
         a.step(choose_moves(agent, a, np.array([0]), oa, 0.0, ra))
         oa = observe(a, "vision5")
         ob = fp.step(ob)
